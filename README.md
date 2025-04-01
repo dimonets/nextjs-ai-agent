@@ -17,6 +17,6 @@ Apps needed to run this application locally:
 3) Copy `~/.env.sample` to `~/.env` and update the GOOGLE API KEY parameter there
 
 4) Run the development server:
-`pnpm run dev`
+`npm run dev`
 
 5) Open [http://localhost:3000](http://localhost:3000) with your browser to see the working application.
