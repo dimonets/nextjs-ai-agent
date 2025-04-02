@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize the Gemini API with your API key
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY || '');
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-exp-03-25:generateContent';
 
 export async function POST(request: Request) {
   try {
@@ -15,26 +13,70 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the Gemini model - using the correct model name
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-
-    // Convert messages to the format expected by Gemini
+    // Convert messages to the format expected by Gemini API
     const prompt = messages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
 
-    // Generate response
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // Prepare the request body according to Gemini API specifications
+    const requestBody = {
+      contents: [{
+        parts: [{
+          text: prompt
+        }]
+      }],
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      },
+      safetySettings: [
+        {
+          category: "HARM_CATEGORY_HARASSMENT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_HATE_SPEECH",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+          category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+          threshold: "BLOCK_MEDIUM_AND_ABOVE"
+        }
+      ]
+    };
+
+    // Make direct API call to Gemini
+    const response = await fetch(`${GEMINI_API_URL}?key=${process.env.GOOGLE_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || 'Failed to generate response');
+    }
+
+    const data = await response.json();
+    
+    // Extract the generated text from the response
+    const generatedText = data.candidates[0].content.parts[0].text;
 
     return NextResponse.json({ 
-      message: text,
+      message: generatedText,
       role: 'assistant'
     });
 
   } catch (error) {
     console.error('Error in chat API:', error);
     return NextResponse.json(
-      { error: 'Failed to process chat request' },
+      { error: error instanceof Error ? error.message : 'Failed to process chat request' },
       { status: 500 }
     );
   }
